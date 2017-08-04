@@ -19,3 +19,12 @@ gdb:	shacheck
 .PHONY: verify
 verify:
 	bash -c 'exec ./shacheck data/ dump | comm -3 - <(sort -m <(7za x -so ../pwned-passwords-1.0.txt.7z) <(7za x -so ../pwned-passwords-update-1.txt.7z) | tr -d \\r)'
+
+.PHONY: check
+check:
+	while read -r pw; do echo -n "$$pw" | sha1sum - | ./shacheck data check; done
+
+.PHONY:	brute
+brute:
+	./shacheck data dump | xargs ./shacheck data check | grep -v '^FOUND'
+

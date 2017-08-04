@@ -417,6 +417,7 @@ check_one(char *line)
   FILE		*fd;
   int		i, c;
   char		buf[BUFSIZ];
+  long		size, entries, min, max;
 
   xDP(("(%s)", line));
 
@@ -451,7 +452,37 @@ check_one(char *line)
       return;
     }
 
-  000;	/* binsearch here	*/
+  size		= hashlen-2;
+  entries	= (total-offset) / size;
+
+  min		= 0;
+  max		= entries;
+
+  for (;;)
+    {
+      int	ent;
+
+      if (min>=max)
+	{
+	  printf("NOTFOUND: %s\n", line);
+	  break;
+	}
+      ent	= (min+max)/2;
+      hash_seek(fd, offset + size * ent);
+      if (1 != fread(buf, size, 1, fd))
+        OOPS("%s: read error entry %ld", hashname, ent);	/* whatever this means on read	*/
+      i	= memcmp(hash+2, buf, size);
+      if (!i)
+	{
+	  printf("FOUND: %s\n", line);
+	  err	= 0;
+	  break;
+	}
+      if (i<0)
+	max	= ent;
+      else
+	min	= ent+1;
+    }
 
   if (ferror(fd) || fclose(fd))
     OOPS("%s: read error", hashname);	/* whatever this means on read	*/

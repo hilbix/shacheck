@@ -1,5 +1,3 @@
-*not ready yet*
-
 # SHAcheck
 
 Fast search trough SHA databases.
@@ -28,6 +26,8 @@ or
 
 
 Notes:
+
+- Return 0 means: At least one SHA was found.  Return 2 means: None of the SHAs were found.  Everything else: You cannot be sure if a SHA was found or not.
 
 - `make verify` checks, that the hashes, which were created with `make data`, indeed can re-create the source information.
 
