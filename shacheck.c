@@ -38,8 +38,13 @@ _d_printf_(const char *s, ...)
 #endif
 #define	xDP(x)
 
-static char	*dir;
-static int	err, hashlen;
+#define	MAGICSZ	16
+
+static char		*dir;
+static int		err, hashlen;
+static char		hashname[FILENAME_MAX];
+static const char	magic[] = "shaCheck=" SHACHECK_FILE_VERSION "=";	/* plus 1 byte hashlength	*/
+static long		offset, total;	/* we assume filesize is below 2 GB	*/
 
 static void
 OOPS(const char *s, ...)
@@ -82,7 +87,7 @@ re_alloc(void *ptr, size_t len)
   return ptr;
 }
 
-static void
+static char *
 my_snprintf(char *buf, size_t max, const char *format, ...)
 {
   va_list	list;
@@ -93,6 +98,7 @@ my_snprintf(char *buf, size_t max, const char *format, ...)
   va_end(list);
   if (len>=max)
     OOPS("internal error, buffer overrun: %s", format);
+  return buf;
 }
 
 static int
@@ -204,6 +210,12 @@ input_read(int file)
       for (i=0; i<MAXHASH && (c=input_hex(input))>=0; i++)
         input->buf[i]	= c;
       input->len	= i;
+      if (!hashlen && i)
+	{
+	  hashlen	= i;
+          if (hashlen<i || hashlen>i)
+	    OOPS("%s:%d: HASH length must be in the range of 16 to 512 hex digits: %d", input->name, input->line, hashlen*2);
+        }
     
       c = fgetc(fd);
 
@@ -288,13 +300,13 @@ inputs_open(char **argv)
   return files;
 }
 
-#define	MAGICSZ	16
-
 static char *
-get_magic(char magic[MAGICSZ])
+mk_hashname(int a, int b)
 {
-  my_snprintf(magic, MAGICSZ, "shaCheck=%s=", SHACHECK_FILE_VERSION);
-  return magic;
+  if (b<0)
+    return my_snprintf(hashname, sizeof hashname, "%s/%02x", dir, a);
+
+  return my_snprintf(hashname, sizeof hashname, "%s/%02x/%02x.hash", dir, a, b);
 }
 
 static void
@@ -303,7 +315,6 @@ create(char **argv)
   FILE		*fd;
   unsigned char	a, b;
   int		files;
-  char		tmp[FILENAME_MAX], magic[MAGICSZ];
 
   files	= inputs_open(argv);
 
@@ -319,30 +330,26 @@ create(char **argv)
 	break;
 
       input	= &inputs[best];
-      if (!hashlen)
-        {
-	  hashlen	= input->len;
-          if (hashlen<8 || hashlen>255)
-	    OOPS("%s:%d: HASH length must be in the range of 16 to 512 hex digits: %d", input->name, input->line, hashlen*2);
-        }
-      else if (hashlen != input->len)
+
+      if (hashlen != input->len)
 	OOPS("%s:%d: all files must have the same HASH length: %d", input->name, input->line, hashlen);
 
       if (!fd || a!=input->buf[0] || b!=input->buf[1])
         {
           if (fd && (ferror(fd) || fclose(fd)))
-	    OOPS("%s: write error", tmp);
+	    OOPS("%s: write error", hashname);
           a	= input->buf[0];
           b	= input->buf[1];
-	  my_snprintf(tmp, sizeof tmp, "%s/%02x", dir, a);
-          if (!isdir(tmp) && mkdir(tmp, 0755))
-	    OOPS("%s: cannot create directory", tmp);
-	  my_snprintf(tmp, sizeof tmp, "%s/%02x/%02x.hash", dir, a, b);
-	  if ((fd = fopen(tmp, "wb")) == NULL)
-	    OOPS("%s: cannot create file", tmp);
+
+	  mk_hashname(a, -1);
+          if (!isdir(hashname) && mkdir(hashname, 0755))
+	    OOPS("%s: cannot create directory", hashname);
+
+	  if ((fd = fopen(mk_hashname(a, b), "wb")) == NULL)
+	    OOPS("%s: cannot create file", hashname);
 
 	  /* initialize file	*/
-          fprintf(fd, "%s%c", get_magic(magic), hashlen);
+          fprintf(fd, "%s%c", magic, hashlen);
 
 	  printf("\r%02x%02x", a, b); fflush(stdout);
         }
@@ -350,7 +357,57 @@ create(char **argv)
       input_read(best);
     }
   if (fd && (ferror(fd) || fclose(fd)))
-    OOPS("%s: write error", tmp);
+    OOPS("%s: write error", hashname);
+}
+
+/* sets:
+ * offset  = offset of data
+ * total   = total file length
+ * hashlen = size of hash (first 2 bytes are in the filename)
+ */
+static FILE *
+hash_open(unsigned char a, unsigned char b)
+{
+  FILE	*fd;
+  int	c;
+  char	buf[MAGICSZ];
+
+  mk_hashname(a, b);
+  if ((fd = fopen(hashname, "rb")) == NULL)
+    {
+      WARN(0, "%s not found: %s", hashname);
+      return 0;
+    }
+
+  offset	= strlen(magic)+1;	/* == sizeof magic	*/
+  if (1 != fread(buf, offset, 1, fd))
+    OOPS("%s: corrupt file, cannot read magic", hashname);
+  if (memcmp(buf, magic, offset-1))
+    OOPS("%s: corrupt file, wrong magic", hashname);
+
+  c	= (unsigned char)buf[offset-1];
+  if (!hashlen)
+    hashlen = c>=8 && c<=255 ? c : -256;	/* do something meaningful in next OOPS	*/
+  if (c != hashlen)
+    OOPS("%s: corrupt file, hashlen %d (expected %d)", hashname, c, hashlen);
+
+  /* Check the file size	*/
+
+  if (fseek(fd, 0, SEEK_END))
+    OOPS("%s: cannot seek to EOF", hashname);
+
+  total	= ftell(fd);
+  if ((total - offset) % (hashlen-2))
+    OOPS("%s: corrupt file, %ld not divisible by %d", hashname, (total - offset), hashlen-2);
+
+  return fd;
+}
+
+static void
+hash_seek(FILE *fd, long off)
+{
+  if (fseek(fd, off, SEEK_SET))
+    OOPS("%s: cannot seek to %l", hashname, off);
 }
 
 static void
@@ -359,18 +416,16 @@ check_one(char *line)
   unsigned char	hash[MAXHASH];
   FILE		*fd;
   int		i, c;
-  char		tmp[FILENAME_MAX], buf[BUFSIZ], magic[MAGICSZ];
-  long		offset, total;	/* we assume filesize is below 2 GB	*/
+  char		buf[BUFSIZ];
 
   xDP(("(%s)", line));
+
   line	= trims(line);
   if (!*line)
     return;
 
   for (i=0; i<MAXHASH && (c=hexbyte(line+i+i))>=0; i++)
     hash[i]	= c;
-
-  xDP(("() %d", i));
 
   if (line[i+i] && !isspace(line[i+i]))
     {
@@ -383,23 +438,12 @@ check_one(char *line)
       return;
     }
 
-  my_snprintf(tmp, sizeof tmp, "%s/%02x/%02x.hash", dir, hash[0], hash[1]);
-  if ((fd = fopen(tmp, "rb")) == NULL)
-    {
-      WARN(0, "%s not found: %s", tmp, line);
-      return;
-    }
-  offset	= strlen(get_magic(magic))+1;
-  if (1 != fread(buf, offset, 1, fd))
-    OOPS("%s: corrupt file, cannot read magic", tmp);
-  if (memcmp(buf, magic, offset-1))
-    OOPS("%s: corrupt file, wrong magic", tmp);
-
-  c	= (unsigned char)buf[offset-1];
-  if (!hashlen)
-    hashlen = c>=8 && c<=255 ? c : i;	/* do something meaningful in next OOPS	*/
-  if (c != hashlen)
-    OOPS("%s: corrupt file, hashlen %d (expected %d)", tmp, c, hashlen);
+  /* Always open and close the hashfile, to keep things simple.
+   *
+   * This might only be inefficient in case of sorted input.
+   * However this is meant for fast single lookups for now.
+   */
+  fd	= hash_open(hash[0], hash[1]);
 
   if (i != hashlen)
     {
@@ -407,18 +451,10 @@ check_one(char *line)
       return;
     }
 
-  /* everything looks good so far	*/
-
-  if (fseek(fd, 0, SEEK_END))
-    OOPS("%s: cannot seek to EOF", tmp);
-
-  total	= ftell(fd);
-  if ((total - offset) % (hashlen-2))
-    OOPS("%s: corrupt file, %ld not divisible by %d", tmp, (total - offset), hashlen-2);
-
   000;	/* binsearch here	*/
 
-  fclose(fd);
+  if (ferror(fd) || fclose(fd))
+    OOPS("%s: read error", hashname);	/* whatever this means on read	*/
 }
 
 static void
@@ -435,10 +471,62 @@ check(char **argv)
       check_one(*argv++);
 }
 
+/* diagnostics	*/
+
+static void
+dump(char **argv)
+{
+  unsigned char	hash[256];
+  FILE		*fd;
+  int		min, max, i, j;
+
+  min	= 0;
+  max	= 65535;
+
+  if (*argv)
+    min	= atoi(*argv++);
+  if (*argv)
+    max	= atoi(*argv++);
+  if (*argv)
+    OOPS("too many arguments, .. dump min max");
+  if (min<0)
+    {
+      min	= 0;
+      WARN(0, "minimum set to %d", min);
+    }
+  if (max>65535)
+    {
+      max	= 65535;
+      WARN(0, "max set to %d", max);
+    }
+
+  for (i=min; i<=max; i++)
+    {
+      long	pos;
+
+      fprintf(stderr, "\r%d", i); fflush(stderr);
+
+      hash[0]	= i>>8;
+      hash[1]	= i;
+
+      fd	= hash_open(hash[0], hash[1]);
+      hash_seek(fd, offset);
+      for (pos=offset; pos<total; pos+=hashlen-2)
+        {
+          if (1 != fread(hash+2, hashlen-2, 1, fd))
+	    OOPS("%s: read error", hashname);
+          for (j=0; j<hashlen; j++)
+	    printf("%02X", hash[j]);
+          printf("\n");
+        }
+      fclose(fd);
+    }
+}
+
 static void
 usage(char **argv)
 {
-  OOPS("Usage: %s datadir create|check args..", argv[0]);
+  OOPS("Usage: %s datadir create|check|dump args..", argv[0]);
 }
 
 int
@@ -459,6 +547,8 @@ main(int argc, char **argv)
     create(argv+3);
   else if (!strcmp(cmd, "check"))
     check(argv+3);
+  else if (!strcmp(cmd, "dump"))
+    dump(argv+3);
   else
     usage(argv);
 
