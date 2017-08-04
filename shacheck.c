@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -112,6 +113,34 @@ hexdigit(char c)
   if (c>='a' && c<='f')
     return c-'a'+10;
   return -1;
+}
+
+static int
+hexbyte(const char *ptr)
+{
+  int	v;
+
+  v	= hexdigit(*ptr++);
+  if (v<0)
+    return v;
+
+  v	<<= 4;
+  v	|=  hexdigit(*ptr);
+  
+  return v;
+}
+
+static char *
+trims(char *s)
+{
+  int	i;
+
+  while (isspace(*s))
+    s++;
+  i	= strlen(s);
+  while (i>0 && isspace(s[--i]))
+    s[i]	= 0;
+  return s;
 }
 
 #define	MAXINPUT	1000	/* should be enough	*/
@@ -259,13 +288,22 @@ inputs_open(char **argv)
   return files;
 }
 
+#define	MAGICSZ	16
+
+static char *
+get_magic(char magic[MAGICSZ])
+{
+  my_snprintf(magic, MAGICSZ, "shaCheck=%s=", SHACHECK_FILE_VERSION);
+  return magic;
+}
+
 static void
 create(char **argv)
 {
   FILE		*fd;
   unsigned char	a, b;
   int		files;
-  char		tmp[FILENAME_MAX];
+  char		tmp[FILENAME_MAX], magic[MAGICSZ];
 
   files	= inputs_open(argv);
 
@@ -288,7 +326,7 @@ create(char **argv)
 	    OOPS("%s:%d: HASH length must be in the range of 16 to 512 hex digits: %d", input->name, input->line, hashlen*2);
         }
       else if (hashlen != input->len)
-	OOPS("%s:%d: all files must have the same hash length: %d", input->name, input->line, hashlen);
+	OOPS("%s:%d: all files must have the same HASH length: %d", input->name, input->line, hashlen);
 
       if (!fd || a!=input->buf[0] || b!=input->buf[1])
         {
@@ -304,7 +342,7 @@ create(char **argv)
 	    OOPS("%s: cannot create file", tmp);
 
 	  /* initialize file	*/
-          fprintf(fd, "shaCheck=%s=%c", SHACHECK_FILE_VERSION, hashlen);
+          fprintf(fd, "%s%c", get_magic(magic), hashlen);
 
 	  printf("\r%02x%02x", a, b); fflush(stdout);
         }
@@ -316,9 +354,85 @@ create(char **argv)
 }
 
 static void
+check_one(char *line)
+{
+  unsigned char	hash[MAXHASH];
+  FILE		*fd;
+  int		i, c;
+  char		tmp[FILENAME_MAX], buf[BUFSIZ], magic[MAGICSZ];
+  long		offset, total;	/* we assume filesize is below 2 GB	*/
+
+  xDP(("(%s)", line));
+  line	= trims(line);
+  if (!*line)
+    return;
+
+  for (i=0; i<MAXHASH && (c=hexbyte(line+i+i))>=0; i++)
+    hash[i]	= c;
+
+  xDP(("() %d", i));
+
+  if (line[i+i] && !isspace(line[i+i]))
+    {
+      WARN(0, "malformed: %s", line);
+      return;
+    }
+  if (i<8 || i>255)
+    {
+      WARN(0, "hashlength %d not in [8..255]: %s", i, line);
+      return;
+    }
+
+  my_snprintf(tmp, sizeof tmp, "%s/%02x/%02x.hash", dir, hash[0], hash[1]);
+  if ((fd = fopen(tmp, "rb")) == NULL)
+    {
+      WARN(0, "%s not found: %s", tmp, line);
+      return;
+    }
+  offset	= strlen(get_magic(magic))+1;
+  if (1 != fread(buf, offset, 1, fd))
+    OOPS("%s: corrupt file, cannot read magic", tmp);
+  if (memcmp(buf, magic, offset-1))
+    OOPS("%s: corrupt file, wrong magic", tmp);
+
+  c	= (unsigned char)buf[offset-1];
+  if (!hashlen)
+    hashlen = c>=8 && c<=255 ? c : i;	/* do something meaningful in next OOPS	*/
+  if (c != hashlen)
+    OOPS("%s: corrupt file, hashlen %d (expected %d)", tmp, c, hashlen);
+
+  if (i != hashlen)
+    {
+      WARN(0, "wrong hashlength %d (expected %d): %s", i, hashlen, line);
+      return;
+    }
+
+  /* everything looks good so far	*/
+
+  if (fseek(fd, 0, SEEK_END))
+    OOPS("%s: cannot seek to EOF", tmp);
+
+  total	= ftell(fd);
+  if ((total - offset) % (hashlen-2))
+    OOPS("%s: corrupt file, %ld not divisible by %d", tmp, (total - offset), hashlen-2);
+
+  000;	/* binsearch here	*/
+
+  fclose(fd);
+}
+
+static void
 check(char **argv)
 {
-  OOPS("not yet");
+  char	buf[BUFSIZ];
+
+  err = 2;
+  if (!*argv)
+    while (fgets(buf, (sizeof buf)-1, stdin))
+      check_one(buf);
+  else
+    while (*argv)
+      check_one(*argv++);
 }
 
 static void
@@ -345,6 +459,8 @@ main(int argc, char **argv)
     create(argv+3);
   else if (!strcmp(cmd, "check"))
     check(argv+3);
+  else
+    usage(argv);
 
   return err;
 }
