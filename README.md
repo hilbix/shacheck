@@ -52,6 +52,7 @@ This can be improved
 
 - They are from https://haveibeenpwned.com/Passwords
 - Please note that these files are very big, please do not unneccessarily download them.
+  - Instead please use the [Torrent](https://www.troyhunt.com/heres-1-4-billion-records-from-have-i-been-pwned-for-you-to-analyse/) and be sure to give back the bandwidth.
 - I am not afiliated with haveibeenpwned nor Troy Hunt.  But I highly appreciate his work!  Thank you very much!
 
 
