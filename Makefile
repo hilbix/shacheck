@@ -5,26 +5,50 @@
 
 CFLAGS=-Wall -O3
 
+DATA=data
+SAMPLE=sample
+
+#INPUTS=$(SAMPLE)/pwned-passwords-1.0.txt.7z $(SAMPLE)/pwned-passwords-update-1.txt.7z
+INPUTS=$(SAMPLE)/pwned-passwords-sha1-ordered-by-hash-v4.7z
+
 .PHONY: all
 all:	shacheck
 
 .PHONY: data
-data:	shacheck
-	bash -c 'exec ./shacheck data/ create <(7za x -so ../pwned-passwords-1.0.txt.7z) <(7za x -so ../pwned-passwords-update-1.txt.7z)'
+data:	shacheck sample
+	bash -xc 'f() { [ 0 = "$${#ARGS[@]}" ] && exec ./shacheck "$(DATA)" create "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx"); }; ARGS=("$$@"); f' . $(INPUTS)
+
+.PHONY:	sample
+sample:	$(INPUTS)
+
+$(INPUTS):
+	@echo '!!!'
+	@echo '!!! Please download $@ from https://haveibeenpwned.com/Passwords'
+	@echo '!!!'
+	false
 
 .PHONY: gdb
-gdb:	shacheck
-	bash -c 'exec gdb --args ./shacheck data/ create <(7za x -so ../pwned-passwords-1.0.txt.7z) <(7za x -so ../pwned-passwords-update-1.txt.7z)'
+gdb:	shacheck sample
+	bash -c 'f() { [ 0 = "$${#ARGS[@]}" ] && exec gdb --args ./shacheck "$(DATA)" create "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx"); }; ARGS=("$$@"); f' . $(INPUTS)
 
+# needs `make data` before
 .PHONY: verify
-verify:
-	bash -c 'exec ./shacheck data/ dump | comm -3 - <(sort -m <(7za x -so ../pwned-passwords-1.0.txt.7z) <(7za x -so ../pwned-passwords-update-1.txt.7z) | tr -d \\r)'
+verify:	sample data/ff/ff.hash
+	bash -c 'f() { [ 0 = "$${#ARGS[@]}" ] && exec sort -m "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx" | sed 's/:.*$$//'); }; ARGS=("$$@"); comm -3 <(exec ./shacheck "$(DATA)" dump) <(f)' . $(INPUTS)
 
+# needs `make data` before
 .PHONY: check
-check:
-	while read -r pw; do echo -n "$$pw" | sha1sum - | ./shacheck data check; done
+check:	data/ff/ff.hash
+	while read -r pw; do echo -n "$$pw" | sha1sum - | ./shacheck "$(DATA)" check; done
 
+# needs `make data` before
 .PHONY:	brute
-brute:
-	./shacheck data dump | xargs ./shacheck data check | grep -v '^FOUND'
+brute:	data/ff/ff.hash
+	./shacheck "$(DATA)" dump | ./shacheck "$(DATA)" check | grep -v '^FOUND: '
+
+data/ff/ff.hash:
+	@echo '!!!'
+	@echo '!!! please run: make data'
+	@echo '!!!'
+	false
 
