@@ -18,7 +18,7 @@
 
 #define	SHACHECK_FILE_VERSION	"0"
 
-#if 1
+#if 0
 #define	DP(X)	do { _d_file_=__FILE__; _d_line_=__LINE__; _d_function_=__FUNCTION__; _d_printf_ X; } while (0)
 static const char *_d_file_, *_d_function_;
 static int _d_line_;
@@ -78,6 +78,7 @@ WARN(int e, const char *s, ...)
   err	= 1;
 }
 
+#if 0
 static void *
 re_alloc(void *ptr, size_t len)
 {
@@ -86,6 +87,7 @@ re_alloc(void *ptr, size_t len)
     OOPS("out of memory");
   return ptr;
 }
+#endif
 
 static char *
 my_snprintf(char *buf, size_t max, const char *format, ...)
@@ -211,17 +213,31 @@ input_read(int file)
         input->buf[i]	= c;
       input->len	= i;
       if (!hashlen && i)
-	{
-	  hashlen	= i;
-          if (hashlen<i || hashlen>i)
-	    OOPS("%s:%d: HASH length must be in the range of 16 to 512 hex digits: %d", input->name, input->line, hashlen*2);
+        {
+          hashlen	= i;
+          if (hashlen<8)
+            OOPS("%s:%d: HASH length must be in the range of 16 to 512 hex digits: %d", input->name, input->line, hashlen*2);
         }
-    
+
       c = fgetc(fd);
+
+      /* regular, new	*/
+      if (c==':')
+        {
+          input->garbage |= 4;
+          while ((c = getc(fd)) && c>='0' && c<='9');
+          if (c=='\n')
+            return;
+        }
+      else if ((input->garbage&12)==4)
+        {
+          input->garbage |= 8;
+          WARN(0, "%s:%d: not in proper new format\n", input->name, input->line);
+        }
 
       /* regular	*/
       if (c=='\n')
-	return;
+        return;
       if (c==EOF)
         { 
           input->eof	= 1;
@@ -229,15 +245,15 @@ input_read(int file)
         }
 
       if (!(input->garbage & 1))
-	{
-	  input->garbage |= 1;
-	  WARN(0, "%s:%d: garbage at the EOL\n", input->name, input->line);
+        {
+          input->garbage |= 1;
+          WARN(0, "%s:%d: garbage at the EOL\n", input->name, input->line);
         }
       while ((c=fgetc(fd))!='\n')
-	if (c==EOF)
-	  {
-	    input->eof	= 1;
-	    return;
+        if (c==EOF)
+          {
+            input->eof	= 1;
+            return;
           }
       if (i)
         return;
@@ -327,31 +343,31 @@ create(char **argv)
       best	= input_best(0, files);
       xDP(("() best=%d", best));
       if (best<0)
-	break;
+        break;
 
       input	= &inputs[best];
 
       if (hashlen != input->len)
-	OOPS("%s:%d: all files must have the same HASH length: %d", input->name, input->line, hashlen);
+        OOPS("%s:%d: all files must have the same HASH length: %d", input->name, input->line, hashlen);
 
       if (!fd || a!=input->buf[0] || b!=input->buf[1])
         {
           if (fd && (ferror(fd) || fclose(fd)))
-	    OOPS("%s: write error", hashname);
+            OOPS("%s: write error", hashname);
           a	= input->buf[0];
           b	= input->buf[1];
 
-	  mk_hashname(a, -1);
+          mk_hashname(a, -1);
           if (!isdir(hashname) && mkdir(hashname, 0755))
-	    OOPS("%s: cannot create directory", hashname);
+            OOPS("%s: cannot create directory", hashname);
 
-	  if ((fd = fopen(mk_hashname(a, b), "wb")) == NULL)
-	    OOPS("%s: cannot create file", hashname);
+          if ((fd = fopen(mk_hashname(a, b), "wb")) == NULL)
+            OOPS("%s: cannot create file", hashname);
 
-	  /* initialize file	*/
+          /* initialize file	*/
           fprintf(fd, "%s%c", magic, hashlen);
 
-	  printf("\r%02x%02x", a, b); fflush(stdout);
+          printf("\r%02x%02x", a, b); fflush(stdout);
         }
       fwrite(input->buf+2, hashlen-2, 1, fd);
       input_read(best);
@@ -463,25 +479,25 @@ check_one(char *line)
       int	ent;
 
       if (min>=max)
-	{
-	  printf("NOTFOUND: %s\n", line);
-	  break;
-	}
+        {
+          printf("NOTFOUND: %s\n", line);
+          break;
+        }
       ent	= (min+max)/2;
       hash_seek(fd, offset + size * ent);
       if (1 != fread(buf, size, 1, fd))
         OOPS("%s: read error entry %ld", hashname, ent);	/* whatever this means on read	*/
       i	= memcmp(hash+2, buf, size);
       if (!i)
-	{
-	  printf("FOUND: %s\n", line);
-	  err	= 0;
-	  break;
-	}
+        {
+          printf("FOUND: %s\n", line);
+          err	= 0;
+          break;
+        }
       if (i<0)
-	max	= ent;
+        max	= ent;
       else
-	min	= ent+1;
+        min	= ent+1;
     }
 
   if (ferror(fd) || fclose(fd))
@@ -545,9 +561,9 @@ dump(char **argv)
       for (pos=offset; pos<total; pos+=hashlen-2)
         {
           if (1 != fread(hash+2, hashlen-2, 1, fd))
-	    OOPS("%s: read error", hashname);
+            OOPS("%s: read error", hashname);
           for (j=0; j<hashlen; j++)
-	    printf("%02X", hash[j]);
+            printf("%02X", hash[j]);
           printf("\n");
         }
       fclose(fd);
