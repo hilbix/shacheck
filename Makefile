@@ -16,7 +16,7 @@ all:	shacheck
 
 .PHONY: data
 data:	shacheck sample
-	bash -c 'f() { [ 0 = "$${#ARGS[@]}" && exec ./shacheck "$(DATA)" create "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx"); }; ARGS=("$$@"); f' . $(INPUTS)
+	bash -xc 'f() { [ 0 = "$${#ARGS[@]}" ] && exec ./shacheck "$(DATA)" create "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx"); }; ARGS=("$$@"); f' . $(INPUTS)
 
 .PHONY:	sample
 sample:	$(INPUTS)
@@ -29,12 +29,12 @@ $(INPUTS):
 
 .PHONY: gdb
 gdb:	shacheck sample
-	bash -c 'f() { [ 0 = "$${#ARGS[@]}" && exec gdb --args ./shacheck "$(DATA)" create "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx"); }; ARGS=("$$@"); f' . $(INPUTS)
+	bash -c 'f() { [ 0 = "$${#ARGS[@]}" ] && exec gdb --args ./shacheck "$(DATA)" create "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx"); }; ARGS=("$$@"); f' . $(INPUTS)
 
 # needs `make data` before
 .PHONY: verify
 verify:	sample data/ff/ff.hash
-	bash -c 'f() { [ 0 = "$${#ARGS[@]}" && exec sort -m "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx" | sed 's/:.*$$//'); }; ARGS=("$$@"); comm -3 <(exec ./shacheck "$(DATA)" dump) <(f)' . $(INPUTS)
+	bash -c 'f() { [ 0 = "$${#ARGS[@]}" ] && exec sort -m "$$@"; nx="$${ARGS[0]}"; ARGS=("$${ARGS[@]:1}"); f "$$@" <(7za x -so "$$nx" | sed 's/:.*$$//'); }; ARGS=("$$@"); comm -3 <(exec ./shacheck "$(DATA)" dump) <(f)' . $(INPUTS)
 
 # needs `make data` before
 .PHONY: check
