@@ -44,7 +44,7 @@ check:	data/ff/ff.hash
 # needs `make data` before
 .PHONY:	brute
 brute:	data/ff/ff.hash
-	./shacheck "$(DATA)" dump | xargs ./shacheck "$(DATA)" check | grep -v '^FOUND: '
+	./shacheck "$(DATA)" dump | ./shacheck "$(DATA)" check | grep -v '^FOUND: '
 
 data/ff/ff.hash:
 	@echo '!!!'
