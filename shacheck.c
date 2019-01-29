@@ -433,6 +433,7 @@ check_one(char *line)
   unsigned char	hash[MAXHASH];
   FILE		*fd;
   int		i, c;
+
   char		buf[BUFSIZ];
   long		size, entries, min, max;
 
@@ -443,16 +444,22 @@ check_one(char *line)
     return;
 
   for (i=0; i<MAXHASH && (c=hexbyte(line+i+i))>=0; i++)
-    hash[i]	= c;
+    if (i<MAXHASH)
+      hash[i]	= c;
+    else
+      {
+        WARN(0, "hashlength %d not in [8..%d]: %s", i+1, line, MAXHASH);
+	return;
+      }
 
   if (line[i+i] && !isspace(line[i+i]))
     {
       WARN(0, "malformed: %s", line);
       return;
     }
-  if (i<8 || i>255)
+  if (i<8)
     {
-      WARN(0, "hashlength %d not in [8..255]: %s", i, line);
+      WARN(0, "hashlength %d not in [8..%d]: %s", i, line, MAXHASH);
       return;
     }
 
