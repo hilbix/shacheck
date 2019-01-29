@@ -226,14 +226,15 @@ input_read(int file)
         {
           input->garbage |= 4;
           while ((c = getc(fd)) && c>='0' && c<='9');
-          if (c=='\n')
-            return;
         }
       else if ((input->garbage&12)==4)
         {
           input->garbage |= 8;
           WARN(0, "%s:%d: not in proper new format\n", input->name, input->line);
         }
+
+      if (c=='\r')
+        c = fgetc(fd);
 
       /* regular	*/
       if (c=='\n')
@@ -247,7 +248,7 @@ input_read(int file)
       if (!(input->garbage & 1))
         {
           input->garbage |= 1;
-          WARN(0, "%s:%d: garbage at the EOL\n", input->name, input->line);
+          WARN(0, "%s:%d: garbage at the EOL: '%c'\n", input->name, input->line, c);
         }
       while ((c=fgetc(fd))!='\n')
         if (c==EOF)
