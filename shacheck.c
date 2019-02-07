@@ -559,7 +559,7 @@ dump(char **argv)
     {
       long	pos;
 
-      fprintf(stderr, "\r%d", i); fflush(stderr);
+      fprintf(stderr, "\r%04x", i); fflush(stderr);
 
       hash[0]	= i>>8;
       hash[1]	= i;
