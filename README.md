@@ -1,8 +1,12 @@
+[![SHAcheck Build Status](https://api.cirrus-ci.com/github/hilbix/shacheck.svg?branch=master)](https://cirrus-ci.com/github/hilbix/shacheck/master)
+
+> **New:** Now supports ZMQ for easy service integration
+
 # SHAcheck
 
-Fast search trough SHA databases.
+Fast search trough SHA databases in the format used by haveibeenpwned.com.
 
-This was quickly assembled, and may contain serious bugs.
+This was quickly assembled.  It works.
 
 
 ## Usage
@@ -11,12 +15,13 @@ This was quickly assembled, and may contain serious bugs.
     cd shacheck
     make
 
-Download a SHA database, like from haveibeenpwned.com and extract it (see `make data`):
+Download a SHA database.  It must be sorted by SHA.  The format must be similar to the one found at haveibeenpwned.com.
+Then you can prepare the `data/` directory like this:
 
     mkdir "$(readlink -m data)"
-    ./shacheck data/ create <(7za x -so ../pwned-passwords-1.0.txt.7z) <(7za x -so ../pwned-passwords-update-1.txt.7z)
+    ./shacheck data/ create <(7za x -so sample/pwned-passwords-1.0.txt.7z) <(7za x -so sample/pwned-passwords-update-1.txt.7z)
 
-Then check passwords:
+Afterwards you can check passwords:
 
     echo -n password | sha1sum | ./shacheck data/ check
 
@@ -24,12 +29,34 @@ or
 
     ./shacheck data/ check SHA..
 
+To dump the SHAs to stdout use
+
+    ./shacheck data/ dump [from [to]]
+
+To run some ZMQ service use
+
+    ./shacheck data/ zmq [ZMQsocket]
+
+A sample program to use this service is
+
+    ./shazmqex [ZMQsocket]
+
+Use it like this:
+
+    ./shacheck data/ zmq &
+    while read -r pw; do echo -n "$pw" | sha1sum; done | ./shazmqex
 
 Notes:
 
-- Return 0 means: At least one SHA was found.  Return 2 means: None of the SHAs were found.  Everything else: You cannot be sure if a SHA was found or not.
+- Return 0 of `shacheck` means: At least one SHA was found.  Return 2 means: None of the SHAs were found.  Everything else: You cannot be sure if a SHA was found or not.
+- For the very simple ZMQ request protocol, see `shazmqex.c`.
 
+- `make data` takes the INPUTS (see `Makefile`, they are expected in the directory `sample/`) and extracts them into `data/`.
 - `make verify` checks, that the hashes, which were created with `make data`, indeed can re-create the source information.
+- `make check` then allows to check for passwords which are given on stdin
+- `make brute` is a little brute force check which makes sure, that all
+
+### convenience
 
 
 ## FAQ
@@ -48,10 +75,10 @@ This can be improved
 
 - You bet.  It was done in a hurry.
 
-`pwned-password*.txt.7z` are missing
+`sample/pwned-password*.txt.7z` are missing
 
-- They are from https://haveibeenpwned.com/Passwords
-- Please note that these files are very big, please do not unneccessarily download them.
+- The latest SHA database can be found at https://haveibeenpwned.com/Passwords
+- Please note that these files are very big, please use BitTorrent to download them.
 - I am not afiliated with haveibeenpwned nor Troy Hunt.  But I highly appreciate his work!  Thank you very much!
 
 
