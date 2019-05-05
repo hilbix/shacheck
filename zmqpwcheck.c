@@ -1,30 +1,29 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
 
 #include <zmq.h>
 
 #include <openssl/sha.h>
 
+static
 #include "shacheck.h"
 
 static void
-zmq_ko(int ret, const char *err)
+OOPS(const char *s, ...)
 {
-  if (!ret)
-    return;
+  va_list	list;
+  int		e = errno;
 
-  fprintf(stderr, "WARN %d: %s: %s\n", ret, err, strerror(errno));
-}
-
-static void
-zmq_ok(int ret, const char *err)
-{
-  if (!ret)
-    return;
-
-  fprintf(stderr, "ERROR %d: %s: %s\n", ret, err, strerror(errno));
+  fprintf(stderr, "ERROR ");
+  va_start(list, s);
+  vfprintf(stderr, s, list);
+  va_end(list);
+  if (e)
+    fprintf(stderr, ": %s", strerror(e));
+  fprintf(stderr, "\n");
   exit(1);
 }
 
@@ -58,8 +57,8 @@ shacheck_zmq(void *r, char *line)
   len	= hex(buf, sizeof buf, sha, sizeof sha);
   printf("%ld %s\n", (long)len, buf);
 
-  zmq_ko(zmq_send(r, buf, len, 0), "send");
-  zmq_ok(zmq_recv(r, buf, sizeof buf, 0), "recv");
+  ZMQ_out(r, buf, len);
+  len	= ZMQ_in(r, buf, sizeof buf);
   printf("%s: %s\n", line, buf);
   switch (*buf)
     {
@@ -88,7 +87,7 @@ main(int argc, char **argv)
   z	= zmq_ctx_new();
   r	= zmq_socket(z, ZMQ_REQ);
   s	= argc==2 ? argv[1] : SHACHECK_ZMQ_DEFAULT;
-  zmq_ok(zmq_connect(r, s), s);
+  ZMQ_connect(r, s);
   ok	= 2;
   while (fgets(buf, (sizeof buf)-1, stdin))
     switch (shacheck_zmq(r, buf))
