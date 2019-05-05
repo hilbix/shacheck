@@ -4,12 +4,10 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#include <zmq.h>
-
 #include <openssl/sha.h>
 
 static
-#include "shacheck.h"
+#include "zmqshacheck.h"
 
 static void
 OOPS(const char *s, ...)
@@ -58,7 +56,7 @@ ZMQ_pwcheck(void *r, char *line)
 
   ZMQ_out(r, buf, len);
   len	= ZMQ_in(r, buf, sizeof buf);
-  printf("%s: %s\n", line, buf);
+  printf("%s %s\n", buf, line);
   switch (*buf)
     {
     case 'F':
