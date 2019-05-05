@@ -1,6 +1,7 @@
 [![SHAcheck Build Status](https://api.cirrus-ci.com/github/hilbix/shacheck.svg?branch=master)](https://cirrus-ci.com/github/hilbix/shacheck/master)
 
-> NOT YET IMPLEMENTED: **New:** Now supports ZMQ for easy service integration
+> - New file format (2 or 3), not compatible to the previous variant
+> - ZMQ for easy service integration
 
 # SHAcheck
 
