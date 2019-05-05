@@ -420,7 +420,7 @@ shacheck_mk_hashname(struct shacheck *m, unsigned char *hash, int filename)
       break;
 
     case SHACHECK_VARIANT3:
-      a		= ((((unsigned)hash[0])<<4)&0xf00) | ((hash[1]>>4)&0xf);
+      a		= ((((unsigned)hash[0])<<4)&0xff0) | ((hash[1]>>4)&0xf);
       b		= ((((unsigned)hash[1])<<8)&0xf00) | ((hash[2]>>0)&0xff);
       dir	= "%s/%03x";
       file	= "%s/%03x/%03x.hash";
@@ -505,12 +505,11 @@ shacheck_create(struct shacheck *m, char **argv)
           memcpy(prefix, m->input->buf, m->variant);
           shacheck_progress(m, prefix);
         }
-      /* just write out the SHAs with the first two bytes removed,
-       * as those are encoded in the XX/XX.hash already
-       * (this is a form of compression).
+      /* write out the SHAs with the first 2 (or 3 for variant==3) bytes removed,
+       * as those are encoded in the XX/XX.hash (or XXX/XXX.hash) already.
+       * (This spares a few similar bytes.)
        */
       fwrite(m->input->buf + m->variant, m->hashlen - m->variant, 1, m->fd);
-
     }
   shacheck_hash_close(m);
 }
@@ -636,7 +635,7 @@ shacheck_check_one(struct shacheck *m, char *line)
 
       if (min>=max)
         {
-          printf("NOTFOUND: %s\n", line);
+          printf("NOTFOUND %s\n", line);
           break;
         }
       ent	= (min+max)/2;
@@ -646,7 +645,7 @@ shacheck_check_one(struct shacheck *m, char *line)
       i	= memcmp(hash + m->variant, buf, size);
       if (!i)
         {
-          printf("FOUND: %s\n", line);
+          printf("FOUND %s\n", line);
           m->err	= 0;
           break;
         }
@@ -728,9 +727,7 @@ shacheck_dump(struct shacheck *m, char **argv)
 }
 
 #ifdef	SHACHECK_WITH_ZMQ
-#include <zmq.h>
-
-#include "shacheck.h"
+#include "zmqshacheck.h"
 
 static void
 shacheck_zmq(struct shacheck *m, char **argv)
