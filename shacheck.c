@@ -69,6 +69,7 @@ struct shacheck
 
     /* state	*/
     int				err;				/* error seen (for return value)?	*/
+    const char			*errs;				/* extended error	*/
     int				hashlen;			/* current hash length we operate on	*/
 
     /* access to .hash-files	*/
@@ -85,19 +86,25 @@ struct shacheck
   };
 
 static void
-OOPS(const char *s, ...)
+vOOPS(int e, const char *s, va_list list)
 {
-  int		e = errno;
-  va_list	list;
-
   fprintf(stderr, "OOPS: ");
-  va_start(list, s);
   vfprintf(stderr, s, list);
-  va_end(list);
   if (e)
     fprintf(stderr, ": %s", strerror(e));
   fprintf(stderr, "\n");
   exit(23);
+}
+
+static void
+OOPS(const char *s, ...)
+{
+  va_list	list;
+  int		e = errno;
+
+  va_start(list, s);
+  vOOPS(e, s, list);
+  va_end(list);
 }
 
 static void
@@ -355,19 +362,37 @@ shacheck_inputs_open(struct shacheck *m, char **argv)
     }
 }
 
-/* structure of the hash name files are:
+/* Structure of the hash name files are:
  * DIR/HH/HH.hash (variant 2)
  * DIR/HHH/HHH.hash (variant 3)
  * inside of the files there is a header followed by a list of binary SHAs
- * with the first 3 byte removed.
+ * with the first 2 or 3 byte removed (according to variant).
  *
- * HHH gives 16^3 = 2^(4*3) = 2^12 = 4096 entries, which is OK
+ * In contrast HH/HH gives us 65536 files with a rough overhead of 128 MB on ext3.
+ * The break-even is at 24K passwords, so beyond that this structure of
+ * storage is more efficient than storing it into a single uncompressed file.
+ * Total saving bytes = 128M - 2*count
+ *
+ * HHH gives 16^3 = 2^(4*3) = 2^12 = 4096 directories on first level, which is OK.
  * HHH/HHH gives us 16 Million files with a rough overhead of 3 GB on ext3.
+ * As 3 bytes are removed on each password, the break-even it at 1G passwords.
+ * Total saving bytes = 3G - 3*count
  *
  * haveibeenpwned.com reports roughly half a billion SHAs (551509767)
  * google reports 4 billion passwords.
  *
- * As soon as we reach ~3 billion passwords, variant 3 is better than variant 2.
+ * As soon as we reach ~3 billion SHAs (3G-128M), variant 3 becomes
+ * more space efficient than variant 2:
+ *
+ * 128 M - 2*count = 3G - 3*count
+ * 3*count - 2*count = 3G - 128M
+ * count = 3G - 128M
+ *
+ * Using variant 3 is recommended today, because the files in
+ * variant 2 start to grow to ~8400 entries per file compared to (more seeks)
+ * variant 3 where files contain only ~16 entries (a single seek),
+ * which probably means a faster lookup on variant 3 at higher load levels
+ * (depending on how good a FS handles higher IO stress).
  */
 static char *
 shacheck_mk_hashname(struct shacheck *m, unsigned char *hash, int filename)
@@ -533,7 +558,7 @@ shacheck_hash_seek(struct shacheck *m, long off)
     OOPS("%s: cannot seek to %l", m->hashname, off);
 }
 
-static void
+static int
 shacheck_check_one(struct shacheck *m, char *line)
 {
   unsigned char	hash[SHACHECK_MAXHASH];
@@ -546,7 +571,10 @@ shacheck_check_one(struct shacheck *m, char *line)
 
   line	= trims(line);
   if (!*line)
-    return;
+    {
+      m->errs	= "missing input";
+      return -1;
+    }
 
   for (i=0; i<SHACHECK_MAXHASH && (c=hexbyte(line+i+i))>=0; i++)
     if (i<SHACHECK_MAXHASH)
@@ -554,18 +582,21 @@ shacheck_check_one(struct shacheck *m, char *line)
     else
       {
         WARN(m, 0, "hashlength %d not in [%d..%d]: %s", i+1, SHACHECK_MINHASH, SHACHECK_MAXHASH, line);
-        return;
+        m->errs	= "too long";
+        return -1;
       }
 
   if (line[i+i] && !isspace(line[i+i]))
     {
       WARN(m, 0, "malformed: %s", line);
-      return;
+      m->errs	= "malformed";
+      return -1;
     }
   if (i<SHACHECK_MINHASH)
     {
       WARN(m, 0, "hashlength %d not in [%d..%d]: %s", i, SHACHECK_MINHASH, SHACHECK_MAXHASH, line);
-      return;
+      m->errs	= "too short";
+      return -1;
     }
 
   /* Always open and close the hashfile, to keep things simple.
@@ -578,7 +609,8 @@ shacheck_check_one(struct shacheck *m, char *line)
   if (i != m->hashlen)
     {
       WARN(m, 0, "wrong hashlength %d (expected %d): %s", i, m->hashlen, line);
-      return;
+      m->errs	= "incompatible length";
+      return -1;
     }
 
   size		= m->hashlen - m->variant;
@@ -589,7 +621,7 @@ shacheck_check_one(struct shacheck *m, char *line)
 
   for (;;)
     {
-      int	ent;
+      int	ent, i;
 
       if (min>=max)
         {
@@ -615,6 +647,8 @@ shacheck_check_one(struct shacheck *m, char *line)
 
   if (ferror(m->fd) || fclose(m->fd))
     OOPS("%s: read error", m->hashname);	/* whatever this means on read	*/
+
+  return i;
 }
 
 static void
@@ -622,7 +656,7 @@ shacheck_check(struct shacheck *m, char **argv)
 {
   char	buf[BUFSIZ];
 
-  m->err = 2;
+  m->err	= 2;
   if (!*argv)
     while (fgets(buf, (sizeof buf)-1, stdin))
       shacheck_check_one(m, buf);
@@ -684,6 +718,66 @@ shacheck_dump(struct shacheck *m, char **argv)
     }
 }
 
+#ifdef	SHACHECK_WITH_ZMQ
+#include <zmq.h>
+
+#include "shacheck.h"
+
+static void
+zmq_ok(int ret, const char *s, ...)
+{
+  va_list	list;
+  int		e;
+
+  if (!ret)
+    return;
+
+  e = errno;
+  va_start(list, s);
+  vOOPS(e, s, list);
+  va_end(list);
+}
+
+static void
+shacheck_zmq(struct shacheck *m, char **argv)
+{
+  const char	*dest = SHACHECK_ZMQ_DEFAULT;
+  void		*z, *r;
+
+  if (*argv)
+    dest	= *argv++;
+  if (*argv || !dest || !*dest || *dest=='-')
+    OOPS("wrong arguments: zmq [" SHACHECK_ZMQ_DEFAULT "]");
+
+  z	= zmq_ctx_new ();
+  r	= zmq_socket(z, ZMQ_REP);
+  zmq_ok(zmq_bind(r, dest), "bind failed: %s", dest);
+  printf("listening for REQs on %s\n", dest);
+  for (;;)
+    {
+      char	buf[BUFSIZ], *s;
+      int	e;
+
+      zmq_recv(r, buf, sizeof buf, 0);
+      m->err	= 2;
+      m->errs	= 0;
+      e	= shacheck_check_one(m, buf);
+      s	= m->err ? "NOTFOUND" : "FOUND";
+      if (e<0 || m->errs)
+        {
+          snprintf(buf, sizeof buf, "ERR %s", m->errs);
+          s	= buf;
+        }
+      else if (strlen(buf)!=e)	/* ignore trailing spaces, but not leading	*/
+        {
+          snprintf(buf, sizeof buf, "%s (garbage)", s);
+          s	= buf;
+        }
+      zmq_send(r, s, strlen(s), 0);
+    }
+}
+#endif
+
 static int
 shacheck_variant(struct shacheck *m, const char *variant)
 {
@@ -699,7 +793,11 @@ shacheck_variant(struct shacheck *m, const char *variant)
 static void
 usage(char **argv)
 {
-  OOPS("Usage: %s datadir [variant] create|check|dump args..", argv[0]);
+  OOPS("Usage: %s datadir [variant] create|check|dump"
+#ifdef	SHACHECK_WITH_ZMQ
+       "|zmq"
+#endif
+       " args..", argv[0]);
 }
 
 static struct shacheck shacheck = { 0 };
@@ -721,7 +819,7 @@ main(int argc, char **argv)
   if (!isdir(m->dir))
     OOPS("%s: not a directory", m->dir);
 
-  argn	= shacheck_variant(m, argv[2]) ? 3 : 4;
+  argn	= shacheck_variant(m, argv[2]) ? 3 : 2;
   cmd	= argv[argn++];
 
   if (!strcmp(cmd, "create"))
@@ -730,6 +828,10 @@ main(int argc, char **argv)
     shacheck_check(m, argv+argn);
   else if (!strcmp(cmd, "dump"))
     shacheck_dump(m, argv+argn);
+#ifdef	SHACHECK_WITH_ZMQ
+  else if (!strcmp(cmd, "zmq"))
+    shacheck_zmq(m, argv+argn);
+#endif
   else
     usage(argv);
 
