@@ -40,17 +40,19 @@ To run some ZMQ service use
 
 A sample program to use this service is
 
-    ./shazmqex [ZMQsocket]
+    ./zmqpwcheck [ZMQsocket]
 
 Use it like this:
 
     ./shacheck data/ zmq &
-    while read -r pw; do echo -n "$pw" | sha1sum; done | ./shazmqex
+    ./zmqpwcheck
+    # enter passwords or phrases
 
 Notes:
 
 - Return 0 of `shacheck` means: At least one SHA was found.  Return 2 means: None of the SHAs were found.  Everything else: You cannot be sure if a SHA was found or not.
-- For the very simple ZMQ request protocol, see `shazmqex.c`.
+- For the very simple ZMQ request protocol to check for passwords, see `zmqpwcheck.c` function `ZMQ_pwcheck`.
+- 30-40 password-checks per second via ZMQ, shacheck version 2, on moderate hardware
 
 - `make data` takes the INPUTS (see `Makefile`, they are expected in the directory `sample/`) and extracts them into `data/`.
 - `make verify` checks, that the hashes, which were created with `make data`, indeed can re-create the source information.
