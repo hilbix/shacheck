@@ -3,7 +3,7 @@
 # This Works is placed under the terms of the Copyright Less License,
 # see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
 
-APPS=shacheck zmqpwcheck
+APPS=shacheck zmqpwcheck zmqshacheck
 CFLAGS=-Wall -Wno-unused-function -O3 -DSHACHECK_WITH_ZMQ
 LDLIBS=-lzmq -lcrypto
 
@@ -22,6 +22,8 @@ data:	shacheck sample
 
 .PHONY:	sample
 sample:	$(INPUTS)
+
+$(APPS):	zmqshacheck.h
 
 $(INPUTS):
 	@echo '!!!'
