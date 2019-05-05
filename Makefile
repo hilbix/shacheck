@@ -4,7 +4,7 @@
 # see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
 
 APPS=shacheck zmqpwcheck
-CFLAGS=-Wall -O3 -DSHACHECK_WITH_ZMQ
+CFLAGS=-Wall -Wno-unused-function -O3 -DSHACHECK_WITH_ZMQ
 LDLIBS=-lzmq -lcrypto
 
 DATA=data
