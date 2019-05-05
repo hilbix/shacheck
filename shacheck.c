@@ -272,13 +272,23 @@ shacheck_input_read(struct shacheck *m, int file)
       /* regular, new	*/
       if (c==':')
         {
-          m->input->garbage |= 4;
+          m->input->garbage |= 8;
           while ((c = getc(m->input->fd)) && c>='0' && c<='9');
         }
-      else if ((m->input->garbage&12)==4)
+      else if (i || c!=EOF)
+        m->input->garbage |= 16;
+
+      switch (m->input->garbage&(8|16))
         {
-          m->input->garbage |= 8;
-          WARN(m, 0, "%s:%d: not in proper new format\n", m->input->name, m->input->line);
+        default:
+          if (!(m->input->garbage & 8))
+            {
+              m->input->garbage |= 8;
+              WARN(m, 0, "%s:%d: not in proper format\n", m->input->name, m->input->line);
+            }
+        case 8:
+        case 16:
+          break;
         }
 
       if (c=='\r')
@@ -288,7 +298,7 @@ shacheck_input_read(struct shacheck *m, int file)
       if (c=='\n')
         return;
       if (c==EOF)
-        { 
+        {
           m->input->eof	= 1;
           return;
         }
