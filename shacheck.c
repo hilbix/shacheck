@@ -525,7 +525,7 @@ shacheck_hash_open(struct shacheck *m, unsigned char *hash)
   shacheck_mk_hashname(m, hash, 1);
   if ((m->fd = fopen(m->hashname, "rb")) == NULL)
     {
-      WARN(m, 0, "%s not found: %s", m->hashname);
+      WARN(m, 0, "%s not found", m->hashname);
       return;
     }
 
@@ -725,21 +725,6 @@ shacheck_dump(struct shacheck *m, char **argv)
 #include "shacheck.h"
 
 static void
-zmq_ok(int ret, const char *s, ...)
-{
-  va_list	list;
-  int		e;
-
-  if (!ret)
-    return;
-
-  e = errno;
-  va_start(list, s);
-  vOOPS(e, s, list);
-  va_end(list);
-}
-
-static void
 shacheck_zmq(struct shacheck *m, char **argv)
 {
   const char	*dest = SHACHECK_ZMQ_DEFAULT;
@@ -752,14 +737,16 @@ shacheck_zmq(struct shacheck *m, char **argv)
 
   z	= zmq_ctx_new ();
   r	= zmq_socket(z, ZMQ_REP);
-  zmq_ok(zmq_bind(r, dest), "bind failed: %s", dest);
+  ZMQ_bind(r, dest);
   printf("listening for REQs on %s\n", dest);
   for (;;)
     {
       char	buf[BUFSIZ], *s;
       int	e;
+      size_t	l;
 
-      zmq_recv(r, buf, sizeof buf, 0);
+      l		= ZMQ_in(r, buf, sizeof buf-1);
+      buf[l]	= 0;
       m->err	= 2;
       m->errs	= 0;
       e	= shacheck_check_one(m, buf);
@@ -769,12 +756,13 @@ shacheck_zmq(struct shacheck *m, char **argv)
           snprintf(buf, sizeof buf, "ERR %s", m->errs);
           s	= buf;
         }
-      else if (strlen(buf)!=e)	/* ignore trailing spaces, but not leading	*/
+      else if (l!=e)
         {
-          snprintf(buf, sizeof buf, "%s (garbage)", s);
+          snprintf(buf, sizeof buf, "%s+garbage", s);
           s	= buf;
         }
-      zmq_send(r, s, strlen(s), 0);
+      l	= strlen(s);
+      ZMQ_out(r, s, l);
     }
 }
 #endif
