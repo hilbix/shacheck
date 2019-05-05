@@ -3,7 +3,9 @@
 # This Works is placed under the terms of the Copyright Less License,
 # see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
 
-CFLAGS=-Wall -O3 -DSHACHECK_WITH_ZMQ
+APPS=shacheck zmqpwcheck
+CFLAGS=-Wall -Wno-unused-function -O3 -DSHACHECK_WITH_ZMQ
+LDLIBS=-lzmq -lcrypto
 
 DATA=data
 SAMPLE=sample
@@ -12,7 +14,7 @@ SAMPLE=sample
 INPUTS=$(SAMPLE)/pwned-passwords-sha1-ordered-by-hash-v4.7z
 
 .PHONY: all
-all:	shacheck
+all:	$(APPS)
 
 .PHONY: data
 data:	shacheck sample
@@ -48,6 +50,9 @@ brute:	data/ff/ff.hash
 
 clean:
 	git clean -fX
+
+debian:
+	sudo apt-get install libzmq3-dev
 
 data/ff/ff.hash:
 	@echo '!!!'
