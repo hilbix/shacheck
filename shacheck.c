@@ -646,10 +646,8 @@ shacheck_check_one(struct shacheck *m, char *line)
         min	= ent+1;
     }
 
-  if (ferror(m->fd) || fclose(m->fd))
-    OOPS("%s: read error", m->hashname);	/* whatever this means on read	*/
-
-  return i;
+  shacheck_hash_close(m);
+  return i+i;
 }
 
 static void
