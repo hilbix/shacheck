@@ -1,3 +1,5 @@
 *~
 /*.o
 /shacheck
+/zmqpwcheck
+/zmqshacheck
