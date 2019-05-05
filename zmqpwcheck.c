@@ -39,7 +39,7 @@ hex(char *buf, size_t max, const void *bin, size_t len)
 }
 
 static int
-shacheck_zmq(void *r, char *line)
+ZMQ_pwcheck(void *r, char *line)
 {
   char		buf[BUFSIZ];
   size_t	len;
@@ -89,7 +89,7 @@ main(int argc, char **argv)
   ZMQ_connect(r, s);
   ok	= 2;
   while (fgets(buf, (sizeof buf)-1, stdin))
-    switch (shacheck_zmq(r, buf))
+    switch (ZMQ_pwcheck(r, buf))
       {
       case 0:
         ok	= 0;
