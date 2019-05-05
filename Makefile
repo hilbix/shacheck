@@ -3,7 +3,7 @@
 # This Works is placed under the terms of the Copyright Less License,
 # see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
 
-CFLAGS=-Wall -O3
+CFLAGS=-Wall -O3 -DSHACHECK_WITH_ZMQ
 
 DATA=data
 SAMPLE=sample
@@ -45,6 +45,9 @@ check:	data/ff/ff.hash
 .PHONY:	brute
 brute:	data/ff/ff.hash
 	./shacheck "$(DATA)" dump | ./shacheck "$(DATA)" check | grep -v '^FOUND: '
+
+clean:
+	git clean -fX
 
 data/ff/ff.hash:
 	@echo '!!!'
