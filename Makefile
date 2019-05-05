@@ -51,6 +51,9 @@ brute:	data/ff/ff.hash
 clean:
 	git clean -fX
 
+debian:
+	sudo apt-get install libzmq3-dev
+
 data/ff/ff.hash:
 	@echo '!!!'
 	@echo '!!! please run: make data'
