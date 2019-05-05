@@ -55,7 +55,6 @@ shacheck_zmq(void *r, char *line)
   SHA1_Final(sha, &h);
 
   len	= hex(buf, sizeof buf, sha, sizeof sha);
-  printf("%ld %s\n", (long)len, buf);
 
   ZMQ_out(r, buf, len);
   len	= ZMQ_in(r, buf, sizeof buf);
