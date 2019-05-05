@@ -678,26 +678,46 @@ shacheck_check(struct shacheck *m, char **argv)
 static void
 shacheck_dump(struct shacheck *m, char **argv)
 {
-  unsigned char	hash[256];
-  int		min, max, i, j;
+  unsigned char	iv[256+SHACHECK_VARIANT_MAX], *hash, *vhash;
+  long		min, max, vmax, i, j;
+  const char	*format;
+
+  switch (m->variant)
+    {
+    case SHACHECK_VARIANT2:
+      format	= "\r%04lx";
+      break;
+
+    case SHACHECK_VARIANT3:
+      format	= "\r%06lx";
+      break;
+
+    default:
+      OOPS("internal error, unknown shacheck_variant %d", m->variant);
+    }
+
+  vmax	= (1<<(8 * m->variant))-1;
+  vhash	= iv+SHACHECK_VARIANT_MAX;
+  hash	= vhash - m->variant;
 
   min	= 0;
-  max	= 65535;
+  max	= vmax;
 
   if (*argv)
-    min	= atoi(*argv++);
+    min	= strtoul(*argv++, NULL, 0);
   if (*argv)
-    max	= atoi(*argv++);
+    max	= strtoul(*argv++, NULL, 0);
   if (*argv)
-    OOPS("too many arguments, .. dump min max");
+    OOPS("too many arguments: dump min max");
+
   if (min<0)
     {
       min	= 0;
       WARN(m, 0, "minimum set to %d", min);
     }
-  if (max>65535)
+  if (max>vmax)
     {
-      max	= 65535;
+      max	= vmax;
       WARN(m, 0, "max set to %d", max);
     }
 
@@ -706,17 +726,18 @@ shacheck_dump(struct shacheck *m, char **argv)
       long	pos;
       int	step;
 
-      fprintf(stderr, "\r%04x", i); fflush(stderr);
+      fprintf(stderr, format, i); fflush(stderr);
 
-      hash[0]	= i>>8;
-      hash[1]	= i;
+      iv[0]	= i>>16;
+      iv[1]	= i>>8;
+      iv[2]	= i;
 
-      shacheck_hash_open(m, hash);
+      shacheck_hash_open(m, iv);
       shacheck_hash_seek(m, m->hash_offset);
       step	= m->hashlen - m->variant;
       for (pos = m->hash_offset; pos < m->hash_filesize; pos += step)
         {
-          if (1 != fread(hash + m->variant, step, 1, m->fd))
+          if (1 != fread(vhash, step, 1, m->fd))
             OOPS("%s: read error", m->hashname);
           for (j=0; j < m->hashlen; j++)
             printf("%02X", hash[j]);
