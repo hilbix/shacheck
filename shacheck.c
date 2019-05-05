@@ -492,6 +492,7 @@ shacheck_create(struct shacheck *m, char **argv)
           shacheck_mk_magic(m);
           fprintf(m->fd, "%s%c", m->magic, m->hashlen);
 
+          memcpy(prefix, m->input->buf, m->variant);
           shacheck_progress(m, prefix);
         }
       /* just write out the SHAs with the first two bytes removed,
