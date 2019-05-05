@@ -2,9 +2,11 @@
  * see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
  */
 
-#define SHACHECK_ZMQ_DEFAULT    "tcp://127.0.0.1:1354"  /* 0x54a        */
-
 void OOPS(const char *s, ...);
+
+#include <zmq.h>
+
+#define SHACHECK_ZMQ_DEFAULT    "tcp://127.0.0.1:1354"  /* 0x54a        */
 
 #define	ZMQ_STR2(x)	#x
 #define	ZMQ_STR1(x)	ZMQ_STR2(x)
