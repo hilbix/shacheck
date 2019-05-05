@@ -54,7 +54,7 @@ Notes:
 - `make data` takes the INPUTS (see `Makefile`, they are expected in the directory `sample/`) and extracts them into `data/`.
 - `make verify` checks, that the hashes, which were created with `make data`, indeed can re-create the source information.
 - `make check` then allows to check for passwords which are given on stdin
-- `make brute` is a little brute force check which makes sure, that all
+- `make brute` is a little brute force check which makes sure, that all given SHAs are found
 
 ### convenience
 
