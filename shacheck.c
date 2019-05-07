@@ -732,7 +732,7 @@ shacheck_dump(struct shacheck *m, char **argv)
       iv[1]	= i>>8;
       iv[2]	= i;
 
-      shacheck_hash_open(m, iv);
+      shacheck_hash_open(m, hash);
       shacheck_hash_seek(m, m->hash_offset);
       step	= m->hashlen - m->variant;
       for (pos = m->hash_offset; pos < m->hash_filesize; pos += step)
