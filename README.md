@@ -2,6 +2,7 @@
 
 > - New file format (2 or 3), not compatible to the previous variant
 > - ZMQ for easy service integration
+> - Hot updating (`create`) supported while data in use
 
 # SHAcheck
 
@@ -46,20 +47,28 @@ Use it like this:
 
     ./shacheck data/ zmq &
     ./zmqpwcheck
-    # enter passwords or phrases
+    # feed passwords or phrases on stdin
+
+Example:
+
+    ./zmqpwcheck </usr/share/dict/american-english
 
 Notes:
 
 - Return 0 of `shacheck` means: At least one SHA was found.  Return 2 means: None of the SHAs were found.  Everything else: You cannot be sure if a SHA was found or not.
 - For the very simple ZMQ request protocol to check for passwords, see `zmqpwcheck.c` function `ZMQ_pwcheck`.
-- 30-40 password-checks per second via ZMQ, shacheck version 2, on moderate hardware
+- Some numbers on V6data extracted to disk in shacheck file format 2:
+  - It takes 65536 files, 257 directories on disk.  (Counts are NOT included.)
+  - Those need a little bit more than 10 GiB (which is a bit **less** than the compressed download with the counts!).
+  - On moderate hardware (no SSD) you can expect to be able to check 25 passwords/s via the ZMQ adapter.
+  - This are more than 2 million passwords per day.
+  - This gives 100 TPS on-disk with a sustained read rate of 8 MiB/s
+  - Hence with SSD or RAM cache you can check a much bigger number, I did not test.
 
 - `make data` takes the INPUTS (see `Makefile`, they are expected in the directory `sample/`) and extracts them into `data/`.
-- `make verify` checks, that the hashes, which were created with `make data`, indeed can re-create the source information.
+- `make verify` checks, that the hashes, which were created with `make data`, indeed can re-create the source information (without counts or additional information, though).
 - `make check` then allows to check for passwords which are given on stdin
 - `make brute` is a little brute force check which makes sure, that all given SHAs are found
-
-### convenience
 
 
 ## FAQ
