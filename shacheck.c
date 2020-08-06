@@ -74,7 +74,8 @@ struct shacheck
 
     /* access to .hash-files	*/
     FILE			*fd;				/* currently open hash	*/
-    char			hashname[FILENAME_MAX];		/* path to current .hash file	*/
+    char			hashname[FILENAME_MAX];		/* path to current .hash or .hash.tmp file	*/
+    char			newhashname[FILENAME_MAX];	/* rename after .hash.tmp file was written	*/
     char			magic[SHACHECK_MAGIC_BUF];	/* file header magic	*/
     long			hash_offset;			/* where the SHAs start	*/
     long			hash_filesize;			/* we assume filesize is below 2 GB	*/
@@ -372,6 +373,13 @@ shacheck_inputs_open(struct shacheck *m, char **argv)
     }
 }
 
+enum shacheck_filename
+  {
+    SHACHECK_DIR,	/* dir only		*/
+    SHACHECK_FILE,	/* dir/file.hash	*/
+    SHACHECK_TMP,	/* dir/file.hash.tmp	*/
+  };
+
 /* Structure of the hash name files are:
  * DIR/HH/HH.hash (variant 2)
  * DIR/HHH/HHH.hash (variant 3)
@@ -405,32 +413,34 @@ shacheck_inputs_open(struct shacheck *m, char **argv)
  * (depending on how good a FS handles higher IO stress).
  */
 static char *
-shacheck_mk_hashname(struct shacheck *m, unsigned char *hash, int filename)
+shacheck_mk_hashname(struct shacheck *m, unsigned char *hash, enum shacheck_filename type)
 {
   int a, b;
-  const char *dir, *file;
+  const char *v[3];
 
   switch (m->variant)
     {
     case SHACHECK_VARIANT2:
-      a		= hash[0];
-      b		= hash[1];
-      dir	= "%s/%02x";
-      file	= "%s/%02x/%02x.hash";
+      a			= hash[0];
+      b			= hash[1];
+      v[SHACHECK_DIR]	= "%s/%02x";
+      v[SHACHECK_FILE]	= "%s/%02x/%02x.hash";
+      v[SHACHECK_TMP]	= "%s/%02x/%02x.hash.tmp";
       break;
 
     case SHACHECK_VARIANT3:
-      a		= ((((unsigned)hash[0])<<4)&0xff0) | ((hash[1]>>4)&0xf);
-      b		= ((((unsigned)hash[1])<<8)&0xf00) | ((hash[2]>>0)&0xff);
-      dir	= "%s/%03x";
-      file	= "%s/%03x/%03x.hash";
+      a			= ((((unsigned)hash[0])<<4)&0xff0) | ((hash[1]>>4)&0xf);
+      b			= ((((unsigned)hash[1])<<8)&0xf00) | ((hash[2]>>0)&0xff);
+      v[SHACHECK_DIR]	= "%s/%03x";
+      v[SHACHECK_FILE]	= "%s/%03x/%03x.hash";
+      v[SHACHECK_TMP]	= "%s/%03x/%03x.hash.tmp";
       break;
 
     default:
       OOPS("internal error, unknown shacheck_variant %d", m->variant);
     }
 
-  return my_snprintf(m->hashname, sizeof m->hashname, filename ? file : dir, m->dir, a, b);
+  return my_snprintf(m->hashname, sizeof m->hashname, v[type], m->dir, a, b);
 }
 
 static void
@@ -451,6 +461,9 @@ shacheck_hash_close(struct shacheck *m)
     return;
   if (ferror(m->fd) || fclose(m->fd))
     OOPS("%s: write error", m->hashname);
+  if (m->newhashname[0] && rename(m->hashname, m->newhashname))
+    OOPS("%s: cannot rename", m->hashname);
+  m->newhashname[0]	= 0;
   m->fd	= 0;
 }
 
@@ -491,11 +504,14 @@ shacheck_create(struct shacheck *m, char **argv)
         {
           shacheck_hash_close(m);
 
-          shacheck_mk_hashname(m, m->input->buf, 0);	/* this returns the directory in global "hashname" */
+          shacheck_mk_hashname(m, m->input->buf, SHACHECK_DIR);
           if (!isdir(m->hashname) && mkdir(m->hashname, 0755))
             OOPS("%s: cannot create directory", m->hashname);
 
-          if ((m->fd = fopen(shacheck_mk_hashname(m, m->input->buf, 1), "wb")) == NULL)
+          shacheck_mk_hashname(m, m->input->buf, SHACHECK_FILE);
+          strncpy(m->newhashname, m->hashname, sizeof m->newhashname);	/* sorry, this is a bit clumsy	*/
+
+          if ((m->fd = fopen(shacheck_mk_hashname(m, m->input->buf, SHACHECK_TMP), "wb")) == NULL)
             OOPS("%s: cannot create file", m->hashname);
 
           /* write file header	*/
@@ -531,8 +547,7 @@ shacheck_hash_open(struct shacheck *m, unsigned char *hash)
       shacheck_hash_close(m);	/* not reached, but would be proper mititgagion	*/
     }
 
-  shacheck_mk_hashname(m, hash, 1);
-  if ((m->fd = fopen(m->hashname, "rb")) == NULL)
+  if ((m->fd = fopen(shacheck_mk_hashname(m, hash, SHACHECK_FILE), "rb")) == NULL)
     {
       WARN(m, 0, "%s not found", m->hashname);
       return;
@@ -815,11 +830,10 @@ usage(char **argv)
        " args..", argv[0]);
 }
 
-static struct shacheck shacheck = { 0 };
-
 int
 main(int argc, char **argv)
 {
+  static struct shacheck shacheck = { 0 };
   struct shacheck	*m = &shacheck;
   const char		*cmd;
   int			argn;
