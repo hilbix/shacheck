@@ -11,7 +11,8 @@ DATA=data
 SAMPLE=sample
 
 #INPUTS=$(SAMPLE)/pwned-passwords-1.0.txt.7z $(SAMPLE)/pwned-passwords-update-1.txt.7z
-INPUTS=$(SAMPLE)/pwned-passwords-sha1-ordered-by-hash-v4.7z
+#INPUTS=$(SAMPLE)/pwned-passwords-sha1-ordered-by-hash-v4.7z
+INPUTS=$(SAMPLE)/pwned-passwords-sha1-ordered-by-hash-v6.7z
 
 .PHONY: all
 all:	$(APPS)
