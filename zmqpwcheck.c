@@ -1,29 +1,7 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <errno.h>
-
-#include <openssl/sha.h>
-
-static
+#define	STATIC	static
 #include "zmqshacheck.h"
 
-static void
-OOPS(const char *s, ...)
-{
-  va_list	list;
-  int		e = errno;
-
-  fprintf(stderr, "ERROR ");
-  va_start(list, s);
-  vfprintf(stderr, s, list);
-  va_end(list);
-  if (e)
-    fprintf(stderr, ": %s", strerror(e));
-  fprintf(stderr, "\n");
-  exit(1);
-}
+#include <openssl/sha.h>
 
 static int
 hex(char *buf, size_t max, const void *bin, size_t len)
