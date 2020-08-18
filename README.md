@@ -1,4 +1,4 @@
-[![SHAcheck Build Status](https://api.cirrus-ci.com/github/hilbix/shacheck.svg?branch=master)](https://cirrus-ci.com/github/hilbix/shacheck/master)
+[![SHAcheck Build Status](https://api.cirrus-ci.com/github/hilbix/shacheck.svg?branch=dev)](https://cirrus-ci.com/github/hilbix/shacheck/dev)
 
 > - New file format (2 or 3), not compatible to the previous variant
 > - ZMQ for easy service integration
