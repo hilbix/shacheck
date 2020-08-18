@@ -10,6 +10,9 @@
 #define	STATIC
 #endif
 
+#ifndef __SHACHECK_OOPS__
+#define	__SHACHECK_OOPS__
+
 STATIC void                                                                                                            
 VOOPS(int e, const char *s, va_list list)
 {
@@ -31,4 +34,6 @@ OOPS(const char *s, ...)
   VOOPS(e, s, list);
   va_end(list);
 }
+
+#endif
 
