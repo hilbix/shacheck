@@ -2,8 +2,7 @@
  * see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
  */
 
-void OOPS(const char *s, ...);
-
+#include "oops.h"
 #include <zmq.h>
 
 #define SHACHECK_ZMQ_DEFAULT    "tcp://127.0.0.1:1354"  /* 0x54a        */
@@ -12,7 +11,7 @@ void OOPS(const char *s, ...);
 #define	ZMQ_STR1(x)	ZMQ_STR2(x)
 #define	ZMQ_FATAL(x)	do { if (x) OOPS("FATAL %s:%d:%s: %s", __FILE__, ZMQ_STR1(__LINE__), __FUNCTION__, #x); } while (0)
 
-static void
+STATIC void
 ZMQ_bind(void *socket, const char *dest)
 {
   ZMQ_FATAL(!socket || !dest);
@@ -20,7 +19,7 @@ ZMQ_bind(void *socket, const char *dest)
     OOPS("zmq_bind failed: %s", dest);
 }
 
-static void
+STATIC void
 ZMQ_connect(void *socket, const char *dest)
 {
   ZMQ_FATAL(!socket || !dest);
@@ -28,7 +27,7 @@ ZMQ_connect(void *socket, const char *dest)
     OOPS("zmq_connect failed: %s", dest);
 }
 
-static size_t
+STATIC size_t
 ZMQ_in(void *socket, void *buf, size_t len)
 {
   int	n;
@@ -41,7 +40,7 @@ ZMQ_in(void *socket, void *buf, size_t len)
   return n;
 }
 
-static void
+STATIC void
 ZMQ_out(void *socket, void *buf, size_t len)
 {
   int	n;
