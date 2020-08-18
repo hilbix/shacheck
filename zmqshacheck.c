@@ -1,27 +1,5 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <errno.h>
-
-static
+#define	STATIC	static
 #include "zmqshacheck.h"
-
-static void
-OOPS(const char *s, ...)
-{
-  va_list	list;
-  int		e = errno;
-
-  fprintf(stderr, "ERROR ");
-  va_start(list, s);
-  vfprintf(stderr, s, list);
-  va_end(list);
-  if (e)
-    fprintf(stderr, ": %s", strerror(e));
-  fprintf(stderr, "\n");
-  exit(1);
-}
 
 static int
 ZMQ_shacheck(void *r, char *line)
