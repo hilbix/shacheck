@@ -3,7 +3,7 @@
  */
 
 #define	STATIC	static
-#include "zmqshacheck.h"
+#include "oops.h"
 
 #include <ctype.h>
 
@@ -737,6 +737,7 @@ shacheck_dump(struct shacheck *m, char **argv)
 }
 
 #ifdef	SHACHECK_WITH_ZMQ
+#include "zmqshacheck.h"
 
 static void
 shacheck_zmq(struct shacheck *m, char **argv)
