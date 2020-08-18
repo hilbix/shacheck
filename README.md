@@ -90,7 +90,8 @@ This can be improved
 `sample/pwned-password*.txt.7z` are missing
 
 - The latest SHA database can be found at https://haveibeenpwned.com/Passwords
-- Please note that these files are very big, please use BitTorrent to download them.
+- Please note that these files are very big, please do not unneccessarily download them.
+  - Instead please use the [Torrent](https://www.troyhunt.com/heres-1-4-billion-records-from-have-i-been-pwned-for-you-to-analyse/) and be sure to give back the bandwidth.
 - I am not afiliated with haveibeenpwned nor Troy Hunt.  But I highly appreciate his work!  Thank you very much!
 
 
