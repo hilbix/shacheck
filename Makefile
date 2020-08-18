@@ -24,7 +24,7 @@ data:	shacheck sample
 .PHONY:	sample
 sample:	$(INPUTS)
 
-$(APPS):	zmqshacheck.h
+$(APPS):	oops.h zmqshacheck.h
 
 $(INPUTS):
 	@echo '!!!'
