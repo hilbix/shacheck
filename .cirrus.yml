@@ -5,4 +5,3 @@ make_task:
   apt_script: apt-get update
   prep_script: make debian
   compile_script: make
-  install_script: make install
