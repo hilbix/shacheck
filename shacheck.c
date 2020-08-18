@@ -2,13 +2,9 @@
  * see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
  */
 
-#define	_GNU_SOURCE
+#define	STATIC	static
+#include "zmqshacheck.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <errno.h>
 #include <ctype.h>
 
 #include <sys/types.h>
@@ -85,28 +81,6 @@ struct shacheck
     struct shacheck_input	*input;				/* current input	*/
     int				input_count;			/* inputs[0..input_count-1] are used	*/
   };
-
-static void
-vOOPS(int e, const char *s, va_list list)
-{
-  fprintf(stderr, "OOPS: ");
-  vfprintf(stderr, s, list);
-  if (e)
-    fprintf(stderr, ": %s", strerror(e));
-  fprintf(stderr, "\n");
-  exit(23);
-}
-
-static void
-OOPS(const char *s, ...)
-{
-  va_list	list;
-  int		e = errno;
-
-  va_start(list, s);
-  vOOPS(e, s, list);
-  va_end(list);
-}
 
 static void
 WARN(struct shacheck *m, int e, const char *s, ...)
@@ -763,7 +737,6 @@ shacheck_dump(struct shacheck *m, char **argv)
 }
 
 #ifdef	SHACHECK_WITH_ZMQ
-#include "zmqshacheck.h"
 
 static void
 shacheck_zmq(struct shacheck *m, char **argv)
