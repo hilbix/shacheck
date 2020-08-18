@@ -55,7 +55,7 @@ clean:
 	git clean -fX
 
 debian:
-	sudo apt-get install libzmq3-dev
+	apt-get install -y libzmq3-dev
 
 data/ff/ff.hash:
 	@echo '!!!'
